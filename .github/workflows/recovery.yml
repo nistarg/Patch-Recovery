@@ -8,50 +8,50 @@ on:
         required: true
         default: 'https://transfer.sh/(RECOMMENDED)'
 
-env:
-  RECOVERY_URL: https://oshi.at/Rpjg
-
 jobs:
   build:
     runs-on: ubuntu-22.04
 
-
     steps:
-    - name: Check Out
-      uses: actions/checkout@main
+    - name: Checkout Repository
+      uses: actions/checkout@v3
 
     - name: Prepare the environment
       run: |
-        sudo apt install git wget lz4 tar openssl python3 -y
+        sudo apt update
+        sudo apt install -y git wget lz4 tar openssl python3
 
     - name: Fetch image from URL
       run: |
-        ls
-        pwd
-        wget ${{github.event.inputs.RECOVERY_URL }} -O recovery.img
+        echo "Downloading recovery image from: ${{ inputs.RECOVERY_URL }}"
+        wget "${{ inputs.RECOVERY_URL }}" -O recovery.img
 
     - name: Patch Process-1
       run: |
-        chmod a+x script1.sh
-        chmod a+x magiskboot
+        chmod +x script1.sh magiskboot
         ./script1.sh || true
 
     - name: Patch Process-2
       run: |
-        chmod a+x script2.sh
+        chmod +x script2.sh
         ./script2.sh || true
         python3 avbtool extract_public_key --key phh.pem --output phh.pub.bin
-        python3 avbtool add_hash_footer --partition_name recovery --partition_size $(wc -c recovery.img |cut -f 1 -d ' ') --image recovery-patched.img --key phh.pem --algorithm SHA256_RSA4096
-        mkdir output && cd output
-        mv ../recovery-patched.img recovery.img
+        python3 avbtool add_hash_footer \
+          --partition_name recovery \
+          --partition_size $(wc -c < recovery.img) \
+          --image recovery-patched.img \
+          --key phh.pem \
+          --algorithm SHA256_RSA4096
+        mkdir output
+        mv recovery-patched.img output/recovery.img
+        cd output
         tar cvf fastbootd-recovery.tar recovery.img
-        md5sum -t fastbootd-recovery.tar >> fastbootd-recovery.tar
+        md5sum fastbootd-recovery.tar >> fastbootd-recovery.tar
         mv fastbootd-recovery.tar fastbootd-recovery.tar.md5
 
-    - name: Upload Recovery
-      uses: actions/upload-artifact@v3.1.3
-
-
+    - name: Upload Patched Recovery
+      uses: actions/upload-artifact@v3
       with:
-        path: /home/runner/work/Patch-Recovery/Patch-Recovery/output/*.md5
         name: Patched-Recovery
+        path: output/fastbootd-recovery.tar.md5
+
